@@ -7,6 +7,9 @@ from twisted.internet import reactor, endpoints
 from twisted.web import server, resource
 
 class Server(resource.Resource):
+    isLeaf = True
+    numberRequests = 0
+
     def render_GET(self, request):
         self.numberRequests += 1
         request.setHeader(b"content-type", b"text/plain")
@@ -14,19 +17,35 @@ class Server(resource.Resource):
         return content.encode("ascii")
 
     def render_POST(self, request):
-        token = request.args[b"token"][0]
-        image_id = request.args[b"id"][0]
-        image_bytes = request.args[b"image"][0]
+        try:
+            token = request.args[b"token"][0]
+            image_id = request.args[b"id"][0]
+            image_bytes = request.args[b"image"][0]
+        except KeyError:
+            return b"Request must have fields 'token', 'id', 'image'"
 
         # create numpy array from student submission
-        stream = BytesIO(image_bytes)
-        with Image.open(stream) as submitted_pil:
-            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
-        reference_filename = path.join(args.image_dir, image_id.decode("ascii") + ".png")
+        try:
+            stream = BytesIO(image_bytes)
+            with Image.open(stream) as submitted_pil:
+                submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
+        except Exception:
+            return "Image data is not in a valid .PNG format."
 
         # create numpy array from corresponding reference
+        reference_filename = path.join(args.image_dir, image_id.decode("ascii") + ".png")
+        if not path.isfile(reference_filename):
+            return "No image with ID {} found in validation set.".format(
+                image_id.decode("ascii"),
+            ).encode("ascii")
         with Image.open(reference_filename) as reference_pil:
             reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)
+
+        if submitted_image.shape != reference_image.shape:
+            return "User-submitted image of shape {} does match {}.".format(
+                submitted_image.shape,
+                reference_image.shape,
+            ).encode("ascii")
 
         rmse = np.sqrt(np.mean(np.square(reference_image - submitted_image)))
         
@@ -37,6 +56,6 @@ if __name__ == "__main__":
     parser.add_argument("--image-dir", help="Directory for reference images")
     parser.add_argument("--port", type=int, default=80, help="Port to run the server")
     args = parser.parse_args()
-    endpoints.serverFromString(reactor, "tcp:8080".format(args.port)).listen(server.Site(Server()))
+    endpoints.serverFromString(reactor, "tcp:{}".format(args.port)).listen(server.Site(Server()))
     print("Preparing to run reactor.")
     reactor.run()
