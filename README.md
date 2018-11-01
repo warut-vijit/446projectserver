@@ -17,12 +17,18 @@ In order to rate limit students, this software uses user tokens issued to each s
 
 In order to launch the server, run
 ```
-python3 twisted_resource.py --image-dir <directory of reference images> --port 8000
+python3 main.py
+    --image-dir <directory of reference images>
+    --port 8000
+    --db-path <database file>
+    --secret-key <hard-to-guess>
+    --setup
 ```
 
 In order to test, try running
 ```
 curl -X POST --form "image=@<path to reference images>/00000001_000.png"
+    --form "netid=<netid>"
     --form "token=<token>"
     --form "id=00000001_000"
     localhost:8000

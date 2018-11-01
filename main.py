@@ -1,4 +1,5 @@
 import argparse
+from database import DB
 from io import BytesIO
 import numpy as np
 from os import path
@@ -18,11 +19,17 @@ class Server(resource.Resource):
 
     def render_POST(self, request):
         try:
-            token = request.args[b"token"][0]
-            image_id = request.args[b"id"][0]
+            netid = request.args[b"netid"][0].decode("ascii")
+            token = request.args[b"token"][0].decode("ascii")
+            image_id = request.args[b"id"][0].decode("ascii")
             image_bytes = request.args[b"image"][0]
         except KeyError:
-            return b"Request must have fields 'token', 'id', 'image'"
+            return b"Request must have fields 'netid', 'token', 'id', 'image'"
+
+        # authenticate user
+        uid = database.student_auth(netid, token)
+        if uid is None:
+            return b"NetID-token combination not recognized"
 
         # create numpy array from student submission
         try:
@@ -33,7 +40,7 @@ class Server(resource.Resource):
             return "Image data is not in a valid .PNG format."
 
         # create numpy array from corresponding reference
-        reference_filename = path.join(args.image_dir, image_id.decode("ascii") + ".png")
+        reference_filename = path.join(args.image_dir, image_id + ".png")
         if not path.isfile(reference_filename):
             return "No image with ID {} found in validation set.".format(
                 image_id.decode("ascii"),
@@ -48,14 +55,25 @@ class Server(resource.Resource):
             ).encode("ascii")
 
         rmse = np.sqrt(np.mean(np.square(reference_image - submitted_image)))
-        
+
+        # record submission
+        database.student_submit(uid)
+
         return str(rmse).encode("ascii")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-dir", help="Directory for reference images")
     parser.add_argument("--port", type=int, default=80, help="Port to run the server")
+    parser.add_argument("--secret-key", help="Secret key used for authentication")
+    parser.add_argument("--db-path", help="File directory path to database file")
+    parser.add_argument("--setup", action="store_true", help="Build DB tables")
     args = parser.parse_args()
+
+    database = DB(args.db_path, args.secret_key)
+    if args.setup:
+        database.setup()
+    
     endpoints.serverFromString(reactor, "tcp:{}".format(args.port)).listen(server.Site(Server()))
     print("Preparing to run reactor.")
     reactor.run()
