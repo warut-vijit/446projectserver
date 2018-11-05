@@ -4,7 +4,7 @@ from io import BytesIO
 import numpy as np
 from os import path
 from PIL import Image
-from twisted.internet import reactor, endpoints
+from twisted.internet import reactor, endpoints, task
 from twisted.web import server, resource
 
 class Server(resource.Resource):
@@ -30,6 +30,10 @@ class Server(resource.Resource):
         uid = database.student_auth(netid, token)
         if uid is None:
             return b"NetID-token combination not recognized"
+
+        # check user rate limit
+        if database.student_credits(uid) <= 0:
+            return b"Please wait a while before sending more requests."
 
         # create numpy array from student submission
         try:
@@ -61,6 +65,10 @@ class Server(resource.Resource):
 
         return str(rmse).encode("ascii")
 
+def restore_credit_failure(failure):
+    print(failure.getBriefTraceback())
+    reactor.stop()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-dir", help="Directory for reference images")
@@ -69,13 +77,23 @@ if __name__ == "__main__":
     parser.add_argument("--db-path", help="File directory path to database file")
     parser.add_argument("--setup", action="store_true", help="Build DB tables")
     parser.add_argument("--db-source", help="Path to netid-name pairs (only if --setup)")
+    parser.add_argument("--credit-max", type=int, default=1000, help="Maximum credits for each student")
+    parser.add_argument("--credit-interval", type=int, default=24, help="Interval for credit restore (hrs)")
     args = parser.parse_args()
 
+    # initialize database connection, setup if necessary
     database = DB(args.db_path, args.secret_key)
     if args.setup:
         database.setup()
         database.batch_add_student(args.db_source)
-    
+
+    # initialize web endpoint
     endpoints.serverFromString(reactor, "tcp:{}".format(args.port)).listen(server.Site(Server()))
-    print("Preparing to run reactor.")
+
+    # initialize periodic restore submission credits
+    loop = task.LoopingCall(database.restore_submission_credits, credits=args.credit_max)
+    loopDeferred = loop.start(args.credit_interval * 3600)
+    loopDeferred.addErrback(restore_credit_failure)
+
+    print("[!] Starting twisted reactor")
     reactor.run()

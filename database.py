@@ -16,27 +16,37 @@ class DB:
 
     def setup(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY, NetID TEXT UNIQUE, Name TEXT, Submissions INT DEFAULT 0)")
+        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY, NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0, Submissions INT DEFAULT 0)")
         cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT, Date DATE DEFAULT CURRENT_TIMESTAMP)")
 
     def student_auth(self, netid, token):
         cur = self.con.cursor()
         cur.execute("SELECT ID FROM Students WHERE NetID='{}'".format(netid))
-        matches = cur.fetchall()
+        matches = cur.fetchone()
         if len(matches) == 0:
             return None 
-        uid = matches[0][0]
+        uid = matches[0]
         reference_hash = sha256(self.secret_key, netid)
         if reference_hash == token:
             return uid
         else:
             return None
 
+    def student_credits(self, uid):
+        cur = self.con.cursor()
+        cur.execute("SELECT Remaining FROM Students WHERE ID = {}".format(uid))
+        return cur.fetchone()[0]
+
     def student_submit(self, uid):
         cur = self.con.cursor()
         cur.execute("UPDATE Students SET Submissions = Submissions + 1 WHERE ID = {}".format(uid))
+        cur.execute("UPDATE Students SET Remaining = Remaining - 1 WHERE ID = {}".format(uid))
         cur.execute("INSERT INTO Logs (UserID) VALUES({})".format(uid))
         self.con.commit()
+        cur.execute("SELECT * FROM Students WHERE ID = {}".format(uid))
+        print(cur.fetchall())
+        cur.execute("SELECT * FROM Logs WHERE UserID = {}".format(uid))
+        print(cur.fetchall())
 
     def readtbl(self, tblname):
         cur = self.con.cursor()
@@ -52,8 +62,13 @@ class DB:
             cur.execute("INSERT INTO Students (NetID, Name) VALUES('{}','{}')".format(netid, name))
         self.con.commit()
 
-
     def add_student(self, netid, name):
         cur = self.con.cursor()
         cur.execute("INSERT INTO Students (NetID, Name) VALUES('{}','{}')".format(netid, name))
+        self.con.commit()
+
+    def restore_submission_credits(self, credits):
+        print("[!] Restoring all student submission credits")
+        cur = self.con.cursor()
+        cur.execute("UPDATE Students SET Remaining = {}".format(credits))
         self.con.commit()
