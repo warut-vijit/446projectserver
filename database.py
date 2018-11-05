@@ -45,6 +45,14 @@ class DB:
         for row in rows:
             print(row)
 
+    def batch_add_student(self, filename):
+        cur = self.con.cursor()
+        for student in open(filename):
+            netid, name, _ = student.split(",")
+            cur.execute("INSERT INTO Students (NetID, Name) VALUES('{}','{}')".format(netid, name))
+        self.con.commit()
+
+
     def add_student(self, netid, name):
         cur = self.con.cursor()
         cur.execute("INSERT INTO Students (NetID, Name) VALUES('{}','{}')".format(netid, name))

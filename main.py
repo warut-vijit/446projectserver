@@ -68,11 +68,13 @@ if __name__ == "__main__":
     parser.add_argument("--secret-key", help="Secret key used for authentication")
     parser.add_argument("--db-path", help="File directory path to database file")
     parser.add_argument("--setup", action="store_true", help="Build DB tables")
+    parser.add_argument("--db-source", help="Path to netid-name pairs (only if --setup)")
     args = parser.parse_args()
 
     database = DB(args.db_path, args.secret_key)
     if args.setup:
         database.setup()
+        database.batch_add_student(args.db_source)
     
     endpoints.serverFromString(reactor, "tcp:{}".format(args.port)).listen(server.Site(Server()))
     print("Preparing to run reactor.")
