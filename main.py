@@ -7,6 +7,46 @@ from PIL import Image
 from twisted.internet import reactor, endpoints, task
 from twisted.web import server, resource
 
+def restore_credit_failure(failure):
+    """
+    Error handler for async restore credit loop
+    """
+    print(failure.getBriefTraceback())
+    reactor.stop()
+
+def score_image(image_id, image_bytes):
+    """
+    Accepts binary data associated with the image
+    Returns either
+        - float : rmse error if successful
+        - str : error message if unsuccessful
+    """
+    # create numpy array from student submission
+    try:
+        stream = BytesIO(image_bytes)
+        with Image.open(stream) as submitted_pil:
+            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
+    except Exception:
+        return "Image data is not in a valid .PNG format."
+
+    # create numpy array from corresponding reference
+    reference_filename = path.join(args.image_dir, image_id)
+    if not path.isfile(reference_filename):
+        return "No image with ID {} found in validation set.".format(
+            image_id
+        )
+    with Image.open(reference_filename) as reference_pil:
+        reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)
+
+    if submitted_image.shape != reference_image.shape:
+        return "User-submitted image of shape {} does match {}.".format(
+            submitted_image.shape,
+            reference_image.shape,
+        )
+
+    rmse = np.sqrt(np.mean(np.square(reference_image - submitted_image)))
+    return rmse
+
 class Server(resource.Resource):
     isLeaf = True
     numberRequests = 0
@@ -21,10 +61,8 @@ class Server(resource.Resource):
         try:
             netid = request.args[b"netid"][0].decode("ascii")
             token = request.args[b"token"][0].decode("ascii")
-            image_id = request.args[b"id"][0].decode("ascii")
-            image_bytes = request.args[b"image"][0]
         except KeyError:
-            return b"Request must have fields 'netid', 'token', 'id', 'image'"
+            return b"Request must have fields 'netid', 'token'"
 
         # authenticate user
         uid = database.student_auth(netid, token)
@@ -35,39 +73,21 @@ class Server(resource.Resource):
         if database.student_credits(uid) <= 0:
             return b"Please wait a while before sending more requests."
 
-        # create numpy array from student submission
-        try:
-            stream = BytesIO(image_bytes)
-            with Image.open(stream) as submitted_pil:
-                submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
-        except Exception:
-            return "Image data is not in a valid .PNG format."
-
-        # create numpy array from corresponding reference
-        reference_filename = path.join(args.image_dir, image_id + ".png")
-        if not path.isfile(reference_filename):
-            return "No image with ID {} found in validation set.".format(
-                image_id.decode("ascii"),
-            ).encode("ascii")
-        with Image.open(reference_filename) as reference_pil:
-            reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)
-
-        if submitted_image.shape != reference_image.shape:
-            return "User-submitted image of shape {} does match {}.".format(
-                submitted_image.shape,
-                reference_image.shape,
-            ).encode("ascii")
-
-        rmse = np.sqrt(np.mean(np.square(reference_image - submitted_image)))
+        # score each image
+        rmse = 0.0
+        for (k, v) in request.args.items():
+            k = k.decode()
+            if k[:3] == "val":
+                score_image_ret = score_image(k, v[0])
+                # just pass error through if raised
+                if type(score_image_ret) == str:
+                    return ("Image {}: ".format(k) + score_image_ret).encode("ascii")
+                rmse += score_image_ret
 
         # record submission
         database.student_submit(uid)
 
         return str(rmse).encode("ascii")
-
-def restore_credit_failure(failure):
-    print(failure.getBriefTraceback())
-    reactor.stop()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

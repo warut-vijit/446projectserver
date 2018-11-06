@@ -27,10 +27,10 @@ python3 main.py
 
 In order to test, try running
 ```
-curl -X POST --form "image=@<path to reference images>/00000001_000.png"
-    --form "netid=<netid>"
-    --form "token=<token>"
-    --form "id=00000001_000"
-    localhost:8000
+python3 sample_request.py
+    --netid <netid>
+    --token <token>
+    --image-dir <directory of submission images>
+    --server "localhost:8000"
 ```
 This command should return `0.0`: the reference image and the submitted one are exactly the same.
