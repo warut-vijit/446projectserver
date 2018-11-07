@@ -16,15 +16,19 @@ class DB:
 
     def setup(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY, NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0, Submissions INT DEFAULT 0)")
-        cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT, Date DATE DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY,
+                        NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0,
+                        Submissions INT DEFAULT 0)")
+        cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT,
+                        Date DATE DEFAULT CURRENT_TIMESTAMP,
+                        val_error FLOAT, total_err FLOAT)")
 
     def student_auth(self, netid, token):
         cur = self.con.cursor()
         cur.execute("SELECT ID FROM Students WHERE NetID='{}'".format(netid))
         matches = cur.fetchone()
         if len(matches) == 0:
-            return None 
+            return None
         uid = matches[0]
         reference_hash = sha256(self.secret_key, netid)
         if reference_hash == token:
@@ -37,11 +41,11 @@ class DB:
         cur.execute("SELECT Remaining FROM Students WHERE ID = {}".format(uid))
         return cur.fetchone()[0]
 
-    def student_submit(self, uid):
+    def student_submit(self, uid, val_error, total_err):
         cur = self.con.cursor()
         cur.execute("UPDATE Students SET Submissions = Submissions + 1 WHERE ID = {}".format(uid))
         cur.execute("UPDATE Students SET Remaining = Remaining - 1 WHERE ID = {}".format(uid))
-        cur.execute("INSERT INTO Logs (UserID) VALUES({})".format(uid))
+        cur.execute("INSERT INTO Logs (UserID) VALUES({}, {}, {})".format(uid, val_error, total_err))
         self.con.commit()
         cur.execute("SELECT * FROM Students WHERE ID = {}".format(uid))
         print(cur.fetchall())
