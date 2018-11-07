@@ -16,12 +16,8 @@ class DB:
 
     def setup(self):
         cur = self.con.cursor()
-        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY,
-                        NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0,
-                        Submissions INT DEFAULT 0)")
-        cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT,
-                        Date DATE DEFAULT CURRENT_TIMESTAMP,
-                        val_error FLOAT, total_err FLOAT)")
+        cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY, NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0, Submissions INT DEFAULT 0)")
+        cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT, Date DATE DEFAULT CURRENT_TIMESTAMP, val_error FLOAT, total_err FLOAT)")
 
     def student_auth(self, netid, token):
         cur = self.con.cursor()
@@ -45,7 +41,7 @@ class DB:
         cur = self.con.cursor()
         cur.execute("UPDATE Students SET Submissions = Submissions + 1 WHERE ID = {}".format(uid))
         cur.execute("UPDATE Students SET Remaining = Remaining - 1 WHERE ID = {}".format(uid))
-        cur.execute("INSERT INTO Logs (UserID) VALUES({}, {}, {})".format(uid, val_error, total_err))
+        cur.execute("INSERT INTO Logs (UserID, val_error, total_err) VALUES('{}', '{}', '{}')".format(uid, val_error, total_err))
         self.con.commit()
         cur.execute("SELECT * FROM Students WHERE ID = {}".format(uid))
         print(cur.fetchall())
