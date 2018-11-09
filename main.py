@@ -74,20 +74,27 @@ class Server(resource.Resource):
             return b"Please wait a while before sending more requests."
 
         # score each image
-        rmse = 0.0
+        val_rmse = 0.0
+        total_rmse = 0.0
+        submited_images = 0
         for (k, v) in request.args.items():
             k = k.decode()
-            if k[:3] == "val":
+            submitted_image += 1
+            if k[:3] == "val" or k[:4] == "test":
                 score_image_ret = score_image(k, v[0])
                 # just pass error through if raised
                 if type(score_image_ret) == str:
                     return ("Image {}: ".format(k) + score_image_ret).encode("ascii")
-                rmse += score_image_ret
+                if k[:3] == "val":
+                    val_rmse += score_image_ret
+                total_rmse += score_image_ret
 
+        if submited_images != 4000:
+            return "incomplete submission"
         # record submission
-        database.student_submit(uid)
+        database.student_submit(uid, val_rmse, total_rmse)
 
-        return str(rmse).encode("ascii")
+        return str(val_rmse).encode("ascii"), str(total_rmse).encode("ascii")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
