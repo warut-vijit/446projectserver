@@ -79,22 +79,26 @@ class Server(resource.Resource):
         submited_images = 0
         for (k, v) in request.args.items():
             k = k.decode()
-            submitted_image += 1
-            if k[:3] == "val" or k[:4] == "test":
+            if ((k[:3] == "val") or (k[:4] == "test")) and (int(k[-9:-4]) < 4000):
+                submited_images += 1
                 score_image_ret = score_image(k, v[0])
+                # print(score_image_ret)
                 # just pass error through if raised
                 if type(score_image_ret) == str:
                     return ("Image {}: ".format(k) + score_image_ret).encode("ascii")
-                if k[:3] == "val":
+                if int(k[-9:-4]) > 2000:
                     val_rmse += score_image_ret
                 total_rmse += score_image_ret
+            elif k[:-4] == ".png":
+                return "invalid image submission {}".format(k).encode("ascii")
 
-        if submited_images != 4000:
-            return "incomplete submission"
+        if submited_images < 3999:
+            print(submited_images)
+            return "incomplete submission (check that you submitted all 4k images and that all images were named using the convention  test_xxxxx.png"
         # record submission
         database.student_submit(uid, val_rmse, total_rmse)
 
-        return str(val_rmse).encode("ascii"), str(total_rmse).encode("ascii")
+        return str(val_rmse).encode("ascii")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
