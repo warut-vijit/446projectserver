@@ -67,6 +67,12 @@ class DB:
         cur.execute("INSERT INTO Students (NetID, Name) VALUES('{}','{}')".format(netid, name))
         self.con.commit()
 
+    def get_leaderboard(self):
+        cur = self.con.cursor()
+        cur.execute("SELECT DISTINCT NetID, MIN(val_error) FROM Logs INNER JOIN Students ON Logs.UserID=Students.ID GROUP BY UserID ORDER BY val_error ASC")
+        rows = cur.fetchall()
+        return rows
+
     def restore_submission_credits(self, credits):
         print("[!] Restoring all student submission credits")
         cur = self.con.cursor()
