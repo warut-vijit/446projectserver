@@ -25,7 +25,7 @@ def score_image(image_id, image_bytes):
     try:
         stream = BytesIO(image_bytes)
         with Image.open(stream) as submitted_pil:
-            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
+            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)[0]
     except Exception:
         return "Image data is not in a valid .PNG format."
 
@@ -36,7 +36,7 @@ def score_image(image_id, image_bytes):
             image_id
         )
     with Image.open(reference_filename) as reference_pil:
-        reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)
+        reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)[0]
 
     if submitted_image.shape != reference_image.shape:
         return "User-submitted image of shape {} does match {}.".format(
@@ -79,8 +79,8 @@ class Server(resource.Resource):
         submitted_images = 0
         for (k, v) in request.args.items():
             k = k.decode()
-            submitted_images += 1
             if k[:3] == "val" or k[:4] == "test":
+                submitted_images += 1
                 score_image_ret = score_image(k, v[0])
                 # just pass error through if raised
                 if type(score_image_ret) == str:
@@ -89,8 +89,9 @@ class Server(resource.Resource):
                     val_rmse += score_image_ret
                 total_rmse += score_image_ret
 
-        #if submitted_images != 4000:
-        #    return "incomplete submission"
+        print(submitted_images)
+        if submitted_images != 4000:
+            return "incomplete submission".encode("ascii")
         # record submission
         database.student_submit(uid, val_rmse, total_rmse)
 
