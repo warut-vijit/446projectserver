@@ -25,7 +25,9 @@ def score_image(image_id, image_bytes):
     try:
         stream = BytesIO(image_bytes)
         with Image.open(stream) as submitted_pil:
-            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)[0]
+            submitted_image = np.asarray(submitted_pil)
+            if len(submitted_image.shape) == 3: # if image is rgb or rgba
+                submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)[0]
     except Exception:
         return "Image data is not in a valid .PNG format."
 
@@ -36,7 +38,9 @@ def score_image(image_id, image_bytes):
             image_id
         )
     with Image.open(reference_filename) as reference_pil:
-        reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)[0]
+        reference_image = np.asarray(reference_pil)
+        if len(reference_image.shape) == 3: # if image is rgb or rgba
+            reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)[0]
 
     if submitted_image.shape != reference_image.shape:
         return "User-submitted image of shape {} does match {}.".format(
