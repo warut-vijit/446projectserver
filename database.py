@@ -69,7 +69,7 @@ class DB:
 
     def get_leaderboard(self):
         cur = self.con.cursor()
-        cur.execute("SELECT DISTINCT NetID, MIN(val_error) FROM Logs INNER JOIN Students ON Logs.UserID=Students.ID GROUP BY UserID ORDER BY val_error ASC")
+        cur.execute("SELECT DISTINCT NetID, val_error FROM Logs INNER JOIN Students ON Logs.UserID=Students.ID GROUP BY UserID ORDER BY date ASC")
         rows = cur.fetchall()
         return rows
 
