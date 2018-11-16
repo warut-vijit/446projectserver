@@ -71,6 +71,7 @@ class DB:
         cur = self.con.cursor()
         cur.execute("SELECT DISTINCT NetID, val_error FROM Logs INNER JOIN Students ON Logs.UserID=Students.ID GROUP BY UserID ORDER BY date ASC")
         rows = cur.fetchall()
+        rows = sorted(rows, key=lambda x: x[1])
         return rows
 
     def restore_submission_credits(self, credits):
