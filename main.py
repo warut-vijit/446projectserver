@@ -86,6 +86,7 @@ class Server(resource.Resource):
             if k[:4] == "test":
                 submitted_images += 1
                 score_image_ret = score_image(k, v[0])
+                # print(score_image_ret)
                 # just pass error through if raised
                 if type(score_image_ret) == str:
                     return ("Image {}: ".format(k) + score_image_ret).encode("ascii")
@@ -94,7 +95,8 @@ class Server(resource.Resource):
                 total_rmse += score_image_ret
 
         if submitted_images < 3999:
-            return "incomplete submission".encode("ascii")
+            return "incomplete submission (check that you submitted all  images and that all images were named using the convention  test_xxxxx.png"
+
         # record submission
         database.student_submit(uid, val_rmse, total_rmse)
 
