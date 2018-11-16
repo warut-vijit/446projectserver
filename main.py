@@ -25,7 +25,9 @@ def score_image(image_id, image_bytes):
     try:
         stream = BytesIO(image_bytes)
         with Image.open(stream) as submitted_pil:
-            submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)
+            submitted_image = np.asarray(submitted_pil)
+            if len(submitted_image.shape) == 3: # if image is rgb or rgba
+                submitted_image = np.asarray(submitted_pil).transpose(-1, 0, 1)[0]
     except Exception:
         return "Image data is not in a valid .PNG format."
 
@@ -36,7 +38,9 @@ def score_image(image_id, image_bytes):
             image_id
         )
     with Image.open(reference_filename) as reference_pil:
-        reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)
+        reference_image = np.asarray(reference_pil)
+        if len(reference_image.shape) == 3: # if image is rgb or rgba
+            reference_image = np.asarray(reference_pil).transpose(-1, 0, 1)[0]
 
     if submitted_image.shape != reference_image.shape:
         return "User-submitted image of shape {} does match {}.".format(
@@ -79,21 +83,20 @@ class Server(resource.Resource):
         submitted_images = 0
         for (k, v) in request.args.items():
             k = k.decode()
-            if ((k[:3] == "val") or (k[:4] == "test")) and (int(k[-9:-4]) < 4000):
+            if k[:4] == "test":
                 submitted_images += 1
                 score_image_ret = score_image(k, v[0])
                 # print(score_image_ret)
                 # just pass error through if raised
                 if type(score_image_ret) == str:
                     return ("Image {}: ".format(k) + score_image_ret).encode("ascii")
-                if int(k[-9:-4]) > 2000:
+                if int(k[5:10]) <= 2000: # first 2000 are validation set
                     val_rmse += score_image_ret
                 total_rmse += score_image_ret
-            elif k[:-4] == ".png":
-                return "invalid image submission {}".format(k).encode("ascii")
+
         if submitted_images < 3999:
-            print(submitted_images)
-            return "incomplete submission (check that you submitted all 4k images and that all images were named using the convention  test_xxxxx.png"
+            return "incomplete submission (check that you submitted all  images and that all images were named using the convention  test_xxxxx.png"
+
         # record submission
         database.student_submit(uid, val_rmse, total_rmse)
 
