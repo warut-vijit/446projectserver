@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     # initialize periodic restore submission credits
     now = datetime.datetime.utcnow()
-    next_midnight = (now.replace(hour=6, minute=0, second=0, microsecond=0) + datetime.timedelta(days=0))
+    next_midnight = (now.replace(hour=6, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1))
     delta = (next_midnight - now).total_seconds()
     loop = task.LoopingCall(database.restore_submission_credits, credits=args.credit_max)
     def credit_restore_loop_start():
