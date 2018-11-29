@@ -1,4 +1,5 @@
 import argparse
+import datetime
 from database import DB
 from io import BytesIO
 import numpy as np
@@ -124,9 +125,14 @@ if __name__ == "__main__":
     endpoints.serverFromString(reactor, "tcp:{}".format(args.port)).listen(server.Site(Server()))
 
     # initialize periodic restore submission credits
+    now = datetime.datetime.utcnow()
+    next_midnight = (now.replace(hour=6, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1))
+    delta = (next_midnight - now).total_seconds()
     loop = task.LoopingCall(database.restore_submission_credits, credits=args.credit_max)
-    loopDeferred = loop.start(args.credit_interval * 3600)
-    loopDeferred.addErrback(restore_credit_failure)
+    def credit_restore_loop_start():
+        loopDeferred = loop.start(args.credit_interval * 3600)
+        loopDeferred.addErrback(restore_credit_failure)
+    reactor.callLater(delta, credit_restore_loop_start)
 
     print("[!] Starting twisted reactor")
     reactor.run()
