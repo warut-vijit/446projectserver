@@ -58,9 +58,20 @@ class Server(resource.Resource):
     def render_GET(self, request):
         request.setHeader(b"content-type", b"text/plain")
         leaderboard = database.get_leaderboard()
-        print(leaderboard)
-        leaderboard_str = ["{}: {}".format(*entry) for entry in leaderboard]
-        return ("\n".join(leaderboard_str)).encode("ascii")
+        c = filter(lambda s: s[1]<9000, leaderboard)
+        d = filter(lambda s: (9000<=s[1] and s[1]<20000), leaderboard)
+        f = filter(lambda s: s[1]>=20000, leaderboard)
+        cstr = ["{}: {}".format(*entry) for entry in c]
+        dstr = ["{}: {}".format(*entry) for entry in d]
+        fstr = ["{}: {}".format(*entry) for entry in f]
+        retstr = ""
+        retstr += "\n[-------------- A/B/C --------------]\n"
+        retstr += "\n".join(cstr)
+        retstr += "\n[---------------- D ----------------]\n"
+        retstr += "\n".join(dstr)
+        retstr += "\n[---------------- F ----------------]\n"
+        retstr += "\n".join(fstr)
+        return retstr.encode("ascii")
 
     def render_POST(self, request):
         try:
