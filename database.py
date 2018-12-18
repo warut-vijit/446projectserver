@@ -19,28 +19,40 @@ class DB:
         cur.execute("CREATE TABLE Students(ID INTEGER PRIMARY KEY, NetID TEXT UNIQUE, Name TEXT, Remaining INT DEFAULT 0, Submissions INT DEFAULT 0)")
         cur.execute("CREATE TABLE Logs(ID INTEGER PRIMARY KEY, UserID INT, Date DATE DEFAULT CURRENT_TIMESTAMP, val_error FLOAT, total_err FLOAT)")
 
-    def student_auth(self, netid, token):
+    def get_uid(netid):
         cur = self.con.cursor()
         cur.execute("SELECT ID FROM Students WHERE NetID='{}'".format(netid))
         matches = cur.fetchone()
         if len(matches) == 0:
             return None
-        uid = matches[0]
+        return matches[0]
+
+    def student_auth(self, netid, token):
+        uid = get_uid(netid)
+        if uid == None:
+            return None
         reference_hash = sha256(self.secret_key, netid)
         if reference_hash == token:
             return uid
         else:
             return None
 
-    def student_credits(self, uid):
+    def student_credits(self, uid, p_uid=None):
         cur = self.con.cursor()
         cur.execute("SELECT Remaining FROM Students WHERE ID = {}".format(uid))
-        return cur.fetchone()[0]
+        student_credits = cur.fetchone()[0]
+        if p_uid is not None:
+            cur.execute("SELECT Remaining FROM Students WHERE ID = {}".format(p_uid))
+            partner_credits = cur.fetchone()[0]
+            student_credits = min(student_credits, partner_credits)
+        return student_credits
 
-    def student_submit(self, uid, val_error, total_err):
+    def student_submit(self, uid, val_error, total_err, p_uid=None):
         cur = self.con.cursor()
         cur.execute("UPDATE Students SET Submissions = Submissions + 1 WHERE ID = {}".format(uid))
         cur.execute("UPDATE Students SET Remaining = Remaining - 1 WHERE ID = {}".format(uid))
+        if p_uid is not None:
+            cur.execute("UPDATE Students SET Remaining = Remaining - 1 WHERE ID = {}".format(p_uid))
         cur.execute("INSERT INTO Logs (UserID, val_error, total_err) VALUES('{}', '{}', '{}')".format(uid, val_error, total_err))
         self.con.commit()
         cur.execute("SELECT * FROM Students WHERE ID = {}".format(uid))

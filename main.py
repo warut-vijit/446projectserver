@@ -7,6 +7,7 @@ from os import path
 from PIL import Image
 from twisted.internet import reactor, endpoints, task
 from twisted.web import server, resource
+from groups import get_partner
 
 def restore_credit_failure(failure):
     """
@@ -58,19 +59,19 @@ class Server(resource.Resource):
     def render_GET(self, request):
         request.setHeader(b"content-type", b"text/plain")
         leaderboard = database.get_leaderboard()
-        c = filter(lambda s: s[1]<9000, leaderboard)
-        d = filter(lambda s: (9000<=s[1] and s[1]<20000), leaderboard)
-        f = filter(lambda s: s[1]>=20000, leaderboard)
-        cstr = ["{}: {}".format(*entry) for entry in c]
-        dstr = ["{}: {}".format(*entry) for entry in d]
-        fstr = ["{}: {}".format(*entry) for entry in f]
+        splits = [
+            filter(lambda s: s[1]<8100, leaderboard),
+            filter(lambda s: (8100<=s[1] and s[1]<9000), leaderboard),
+            filter(lambda s: (9000<=s[1] and s[1]<9700), leaderboard),
+            filter(lambda s: (9700<=s[1] and s[1]<18000), leaderboard),
+            filter(lambda s: s[1]>=18000, leaderboard),
+        ]
+
         retstr = ""
-        retstr += "\n[-------------- A/B/C --------------]\n"
-        retstr += "\n".join(cstr)
-        retstr += "\n[---------------- D ----------------]\n"
-        retstr += "\n".join(dstr)
-        retstr += "\n[---------------- F ----------------]\n"
-        retstr += "\n".join(fstr)
+        splitstr = [["{}: {}".format(*entry) for entry in spl] for spl in splits] 
+        for label, split in zip(["A","B","C","D","F"], splitstr):
+            retstr += "\n[---------------- {} ----------------]\n".format(label)
+            retstr += "\n".join(split)
         return retstr.encode("ascii")
 
     def render_POST(self, request):
@@ -81,12 +82,14 @@ class Server(resource.Resource):
             return b"Request must have fields 'netid', 'token'"
 
         # authenticate user
+        partner = get_partner(netid)
         uid = database.student_auth(netid, token)
+        p_uid = database.get_uid(partner) 
         if uid is None:
             return b"NetID-token combination not recognized"
 
         # check user rate limit
-        if database.student_credits(uid) <= 0:
+        if database.student_credits(uid, p_uid) <= 0:
             return b"Please wait a while before sending more requests."
 
         # score each image
@@ -110,7 +113,7 @@ class Server(resource.Resource):
             return "incomplete submission (check that you submitted all  images and that all images were named using the convention  test_xxxxx.png"
 
         # record submission
-        database.student_submit(uid, val_rmse, total_rmse)
+        database.student_submit(uid, val_rmse, total_rmse, p_uid)
 
         return str(val_rmse).encode("ascii")
 
